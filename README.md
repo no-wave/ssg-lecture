@@ -1,1 +1,3 @@
 # ssg-lecture
+
+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
