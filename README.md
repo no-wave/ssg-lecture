@@ -1,3 +1,5 @@
 # ssg-lecture
 
-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
+
+엑셀 파일 링크
+https://url.kr/ive8z3
