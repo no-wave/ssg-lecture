@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced RAG-HyDE Chat</title>
+    <style>
+        :root {
+            --bg-color: #212121;
+            --sidebar-bg-color: #171717;
+            --chat-bg-color: #333333;
+            --user-msg-bg: #303F9F;
+            --assistant-msg-bg: #424242;
+            --text-color: #E0E0E0;
+            --input-bg-color: #424242;
+            --border-color: #555555;
+            --accent-color: #8C9EFF;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+        }
+
+        .chat-layout {
+            display: flex;
+            height: 100%;
+        }
+
+        .sidebar {
+            width: 320px;
+            background-color: var(--sidebar-bg-color);
+            padding: 20px;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+        }
+        
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .sidebar h2 {
+            margin: 0;
+            font-size: 1.4em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            font-weight: 500;
+            font-size: 0.9em;
+            display: block;
+            margin-bottom: 8px;
+            color: #BDBDBD;
+        }
+        
+        input[type="file"]::file-selector-button {
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background-color: #AAB6FE;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: var(--input-bg-color);
+            color: var(--text-color);
+            font-size: 1em;
+        }
+
+        button#process-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--accent-color);
+            color: #000;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button#process-btn:hover { background-color: #AAB6FE; }
+        button:disabled { background-color: #616161; color: #9E9E9E; cursor: not-allowed; }
+
+        #status { margin-top: 15px; font-weight: 500; font-size: 0.9em; text-align: center; }
+
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .chat-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        #chat-box {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .message {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .msg-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--input-bg-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 5px;
+        }
+        
+        .msg-icon svg { width: 20px; height: 20px; }
+
+        .msg-content {
+            padding: 15px 20px;
+            border-radius: 12px;
+            max-width: 90%;
+            line-height: 1.6;
+        }
+        
+        .user-msg .msg-content { background-color: var(--user-msg-bg); }
+        .assistant-msg .msg-content { background-color: var(--assistant-msg-bg); }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+        }
+        
+        #chat-form {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: var(--input-bg-color);
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        
+        #query-input {
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.1em;
+            resize: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #query-input:focus { outline: none; }
+        
+        #send-btn {
+            background: var(--accent-color);
+            border: none;
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #send-btn:disabled { background-color: #616161; }
+        #send-btn svg { color: #000; }
+
+        .typing-indicator { display: flex; gap: 4px; align-items: center; }
+        .typing-indicator span {
+            width: 8px; height: 8px; background-color: #BDBDBD; border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-of-type(2) { animation-delay: -0.16s; }
+        .typing-indicator span:nth-of-type(3) { animation-delay: -0.32s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+
+        /* 비교 결과 스타일 */
+        .result-columns { display: flex; gap: 20px; }
+        .result-column { flex: 1; background-color: #333333; padding: 15px; border-radius: 8px; }
+        .result-column h3 { margin-top: 0; color: var(--accent-color); }
+        
+        /* 코드 블록 스타일 */
+        pre {
+            background-color: #000;
+            color: #f8f8f2;
+            padding: 1.2em;
+            border-radius: 8px;
+            overflow-x: auto;
+            position: relative;
+        }
+        pre code { font-family: 'Fira Code', 'Courier New', monospace; font-size: 0.9em; }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #555;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        pre:hover .copy-btn { opacity: 1; }
+
+        /* 웰컴 스크린 */
+        #welcome-screen {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        #welcome-screen h1 { font-size: 2.5em; color: var(--text-color); }
+        #welcome-screen p { color: #BDBDBD; font-size: 1.2em; }
+
+    </style>
+</head>
+<body>
+<div class="chat-layout">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>RAG-HyDE Chat</h2>
+        </div>
+        <div class="form-group">
+            <label for="file-upload">1. 지식베이스 파일 업로드</label>
+            <input type="file" id="file-upload" multiple>
+        </div>
+        <div class="form-group">
+            <label for="rag-mode">2. RAG 검색 방식</label>
+            <select id="rag-mode">
+                <option value="compare" selected>Standard vs HyDE 비교</option>
+                <option value="standard">Standard RAG</option>
+                <option value="hyde">HyDE RAG</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="k-slider">검색 청크 수(k): <span id="k-value">5</span></label>
+            <input type="range" id="k-slider" min="1" max="10" value="5">
+        </div>
+        <button id="process-btn">1. 지식베이스 생성</button>
+        <div id="status"></div>
+    </nav>
+    <main class="main-content">
+        <div id="welcome-screen">
+            <h1>Advanced RAG-HyDE Chat</h1>
+            <p>좌측 사이드바에서 분석할 PDF나 이미지 파일을 업로드하고, 지식베이스를 생성해주세요.</p>
+        </div>
+        <div id="chat-container" style="display: none;">
+            <div id="chat-box"></div>
+        </div>
+        <footer class="input-area">
+            <form id="chat-form">
+                <textarea id="query-input" placeholder="업로드한 내용에 대해 질문하세요..." rows="1" disabled></textarea>
+                <button type="submit" id="send-btn" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </button>
+            </form>
+            <p style="font-size: 0.8em; text-align: center; color: #757575; margin-top: 10px;">RAG 모델의 답변은 업로드된 문서에 기반하며, 부정확한 정보를 포함할 수 있습니다.</p>
+        </footer>
+    </main>
+</div>
+
+<script>
+    const processBtn = document.getElementById('process-btn');
+    const fileUpload = document.getElementById('file-upload');
+    const statusDiv = document.getElementById('status');
+    const chatForm = document.getElementById('chat-form');
+    const queryInput = document.getElementById('query-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatBox = document.getElementById('chat-box');
+    const kSlider = document.getElementById('k-slider');
+    const kValueSpan = document.getElementById('k-value');
+    const welcomeScreen = document.getElementById('welcome-screen');
+    const chatContainer = document.getElementById('chat-container');
+
+    kSlider.oninput = () => { kValueSpan.textContent = kSlider.value; };
+    queryInput.addEventListener('input', () => {
+        queryInput.style.height = 'auto';
+        queryInput.style.height = (queryInput.scrollHeight) + 'px';
+    });
+
+    processBtn.addEventListener('click', async () => {
+        if (fileUpload.files.length === 0) {
+            updateStatus('파일을 선택해주세요.', 'red');
+            return;
+        }
+        const formData = new FormData();
+        for (const file of fileUpload.files) { formData.append('files', file); }
+        updateStatus('파일 처리 중... (최초 처리 시 시간이 걸릴 수 있습니다)', '#FFC107');
+        processBtn.disabled = true;
+
+        try {
+            const response = await fetch('/process', { method: 'POST', body: formData });
+            const result = await response.json();
+            if (response.ok) {
+                updateStatus(result.message, '#4CAF50');
+                queryInput.disabled = false;
+                sendBtn.disabled = false;
+                welcomeScreen.style.display = 'none';
+                chatContainer.style.display = 'block';
+                chatBox.innerHTML = '';
+                addMessage('지식베이스가 준비되었습니다. 무엇이 궁금하신가요?', 'assistant');
+            } else {
+                updateStatus(`오류: ${result.message || result.error || result.detail}`, '#F44336');
+            }
+        } catch (error) {
+            updateStatus('서버 통신 오류가 발생했습니다.', '#F44336');
+        } finally {
+            processBtn.disabled = false;
+        }
+    });
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        addMessage(query, 'user');
+        queryInput.value = '';
+        queryInput.style.height = 'auto';
+        sendBtn.disabled = true;
+
+        const assistantMsgId = `msg-${Date.now()}`;
+        addMessage(`<div class="typing-indicator"><span></span><span></span><span></span></div>`, 'assistant', assistantMsgId);
+        
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: query,
+                    mode: document.getElementById('rag-mode').value,
+                    k: parseInt(kSlider.value)
+                })
+            });
+            const result = await response.json();
+            const assistantMsgElement = document.getElementById(assistantMsgId).querySelector('.msg-content');
+
+            if (response.ok) {
+                assistantMsgElement.innerHTML = createResponseHtml(result);
+                // 코드 블록에 복사 버튼 기능 추가
+                assistantMsgElement.querySelectorAll('pre').forEach(pre => {
+                    const code = pre.querySelector('code');
+                    const copyButton = document.createElement('button');
+                    copyButton.className = 'copy-btn';
+                    copyButton.textContent = 'Copy';
+                    copyButton.addEventListener('click', () => {
+                        navigator.clipboard.writeText(code.textContent).then(() => {
+                            copyButton.textContent = 'Copied!';
+                            setTimeout(() => { copyButton.textContent = 'Copy'; }, 2000);
+                        });
+                    });
+                    pre.appendChild(copyButton);
+                });
+            } else {
+                assistantMsgElement.innerHTML = `<p style="color:#FF8A80;">오류: ${result.error || result.detail}</p>`;
+            }
+        } catch (error) {
+            document.getElementById(assistantMsgId).querySelector('.msg-content').innerHTML = `<p style="color:#FF8A80;">답변 생성 중 오류 발생</p>`;
+        } finally {
+            sendBtn.disabled = false;
+        }
+    });
+
+    function simpleMarkdownToHtml(text) {
+        // 1. 코드 블록 처리
+        text = text.replace(/```(.*?)```/gs, (match, code) => {
+            return `<pre><code>${code.trim()}</code></pre>`;
+        });
+        // 2. 굵게, 기울임, 목록 처리
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/^\s*-\s(.*)/gm, '<ul><li>$1</li></ul>')
+            .replace(/<\/ul>\n<ul>/g, ''); // 연속된 목록 합치기
+    }
+    
+    function createResponseHtml(result) {
+        const mode = document.getElementById('rag-mode').value;
+        if (mode === 'compare') {
+            return `
+                <div class="result-columns">
+                    <div class="result-column">
+                        <h3>Standard RAG</h3>
+                        <div>${simpleMarkdownToHtml(result.standard.answer)}</div>
+                        ${createChunksHtml(result.standard.chunks)}
+                    </div>
+                    <div class="result-column">
+                        <h3>HyDE RAG</h3>
+                        <div>${simpleMarkdownToHtml(result.hyde.answer)}</div>
+                        ${createChunksHtml(result.hyde.chunks)}
+                        <details>
+                            <summary>HyDE 생성 가상 문서</summary>
+                            <p style="color:#BDBDBD; font-style:italic;">${result.hyde.hypo_doc}</p>
+                        </details>
+                    </div>
+                </div>`;
+        } else {
+            const res = result.standard || result.hyde;
+            let html = `<div>${simpleMarkdownToHtml(res.answer)}</div>${createChunksHtml(res.chunks)}`;
+            if (result.hyde) {
+                html += `<details><summary>HyDE 생성 가상 문서</summary><p style="color:#BDBDBD; font-style:italic;">${result.hyde.hypo_doc}</p></details>`;
+            }
+            return html;
+        }
+    }
+
+    function createChunksHtml(chunks) {
+        let html = `<details><summary>참고한 정보 조각</summary>`;
+        chunks.forEach(chunk => {
+            const source = chunk.metadata.source || chunk.metadata.source_image || 'N/A';
+            const page = chunk.metadata.page ? ` (Page: ${chunk.metadata.page})` : '';
+            html += `
+                <div style="border-top: 1px dashed #555; padding: 8px 0; margin-top: 8px;">
+                    <p style="font-size:0.8em; color:#BDBDBD; margin:0 0 5px 0;">
+                        <strong>Similarity: ${chunk.similarity.toFixed(4)}</strong> | Source: ${source}${page}
+                    </p>
+                    <p style="font-size:0.9em; color:#E0E0E0; margin:0;">${chunk.text}</p>
+                </div>`;
+        });
+        html += `</details>`;
+        return html;
+    }
+
+    function addMessage(content, sender, id = null) {
+        const msgContainer = document.createElement('div');
+        msgContainer.className = `message ${sender}-msg`;
+        if (id) msgContainer.id = id;
+
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'msg-icon';
+        if (sender === 'user') {
+            iconDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E0E0E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+        } else {
+            iconDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E0E0E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+        }
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'msg-content';
+        contentDiv.innerHTML = content;
+        
+        msgContainer.appendChild(iconDiv);
+        msgContainer.appendChild(contentDiv);
+        chatBox.appendChild(msgContainer);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function updateStatus(message, color) {
+        statusDiv.textContent = message;
+        statusDiv.style.color = color;
+    }
+</script>
+</body>
+</html>
